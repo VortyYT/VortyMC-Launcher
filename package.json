@@ -1,0 +1,40 @@
+{
+  "name": "vortymc-launcher",
+  "version": "1.0.0",
+  "description": "VortyMC Launcher - A sleek Minecraft launcher with purple/black neon theme",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
+    "dev:renderer": "vite",
+    "dev:main": "tsc -p tsconfig.main.json && electron dist/main/main.js",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build": "npm run build:renderer && npm run build:main",
+    "start": "npm run build && electron dist/main/main.js",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "author": "VortyYT",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "electron-store": "^8.2.0",
+    "extract-zip": "^2.0.1",
+
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.2.1",
+    "react-router-dom": "^6.23.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^9.0.8",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.2",
+    "eslint": "^8.57.0",
+    "typescript": "^5.5.2",
+    "vite": "^5.3.1"
+  }
+}
