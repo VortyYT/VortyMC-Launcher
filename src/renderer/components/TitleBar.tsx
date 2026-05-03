@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiMinus, FiMaximize2, FiX } from 'react-icons/fi';
+import VortyLogo from './VortyLogo';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ipcRenderer = (window as any).require?.('electron')?.ipcRenderer;
@@ -12,6 +13,7 @@ export default function TitleBar() {
   return (
     <div className="titlebar">
       <div className="titlebar__brand">
+        <VortyLogo size={20} glow />
         <span className="titlebar__logo">VORTYMC</span>
       </div>
       <div className="titlebar__controls">

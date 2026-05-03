@@ -1,16 +1,19 @@
 import React from 'react';
-import { FiHome, FiPlay, FiPlusSquare, FiUsers, FiSettings } from 'react-icons/fi';
+import { FiHome, FiPlay, FiBox, FiPackage, FiPlusSquare, FiUsers, FiSettings } from 'react-icons/fi';
+import VortyLogo from './VortyLogo';
 import type { Account } from '../App';
 
 interface Props {
   page: string;
-  onNavigate: (page: 'home' | 'play' | 'create' | 'accounts' | 'settings') => void;
+  onNavigate: (page: 'home' | 'play' | 'builds' | 'mods' | 'create' | 'accounts' | 'settings') => void;
   activeAccount: Account | null;
 }
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: FiHome },
   { id: 'play', label: 'Play', icon: FiPlay },
+  { id: 'builds', label: 'Builds', icon: FiBox },
+  { id: 'mods', label: 'Mods', icon: FiPackage },
   { id: 'create', label: 'Create', icon: FiPlusSquare },
   { id: 'accounts', label: 'Accounts', icon: FiUsers },
   { id: 'settings', label: 'Settings', icon: FiSettings },
@@ -19,6 +22,10 @@ const NAV_ITEMS = [
 export default function Sidebar({ page, onNavigate, activeAccount }: Props) {
   return (
     <div className="sidebar">
+      <div className="sidebar__brand" onClick={() => onNavigate('home')}>
+        <VortyLogo size={28} glow />
+        <span className="sidebar__brand-text">VortyMC</span>
+      </div>
       <nav className="sidebar__nav">
         {NAV_ITEMS.map((item) => (
           <div
