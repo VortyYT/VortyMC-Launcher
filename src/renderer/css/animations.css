@@ -1,0 +1,100 @@
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(123, 47, 242, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(123, 47, 242, 0.6);
+  }
+}
+
+/* Staggered card animations */
+.instance-card {
+  animation: slideInUp 0.4s var(--ease) both;
+}
+
+.instance-card:nth-child(1) { animation-delay: 0s; }
+.instance-card:nth-child(2) { animation-delay: 0.05s; }
+.instance-card:nth-child(3) { animation-delay: 0.1s; }
+.instance-card:nth-child(4) { animation-delay: 0.15s; }
+.instance-card:nth-child(5) { animation-delay: 0.2s; }
+.instance-card:nth-child(6) { animation-delay: 0.25s; }
+.instance-card:nth-child(7) { animation-delay: 0.3s; }
+.instance-card:nth-child(8) { animation-delay: 0.35s; }
+
+.version-row {
+  animation: slideInUp 0.3s var(--ease) both;
+}
+
+.account-card {
+  animation: slideInUp 0.3s var(--ease) both;
+}
+
+/* Neon glow effects */
+.btn-glow:hover {
+  animation: glowPulse 2s ease infinite;
+}
+
+/* Ambient background animation */
+.page-header::after {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(123, 47, 242, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  animation: pulse 6s ease infinite;
+}
+
+.page-header {
+  position: relative;
+}

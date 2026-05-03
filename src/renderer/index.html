@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VortyMC Launcher</title>
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Custom Title Bar -->
+  <div id="titlebar">
+    <div class="titlebar-drag">
+      <div class="titlebar-logo">
+        <div class="logo-icon">
+          <i class="fas fa-cube"></i>
+        </div>
+        <span class="logo-text">VortyMC</span>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <button id="btn-minimize" class="titlebar-btn" title="Minimize">
+        <i class="fas fa-minus"></i>
+      </button>
+      <button id="btn-maximize" class="titlebar-btn" title="Maximize">
+        <i class="far fa-square"></i>
+      </button>
+      <button id="btn-close" class="titlebar-btn btn-close" title="Close">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="app-container">
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar">
+      <div class="nav-section">
+        <div class="nav-label">MAIN</div>
+        <button class="nav-item active" data-page="home">
+          <i class="fas fa-home"></i>
+          <span>Home</span>
+        </button>
+        <button class="nav-item" data-page="create">
+          <i class="fas fa-plus-circle"></i>
+          <span>Create</span>
+        </button>
+        <button class="nav-item" data-page="versions">
+          <i class="fas fa-download"></i>
+          <span>Versions</span>
+        </button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">ACCOUNT</div>
+        <button class="nav-item" data-page="accounts">
+          <i class="fas fa-user-circle"></i>
+          <span>Accounts</span>
+        </button>
+        <button class="nav-item" data-page="settings">
+          <i class="fas fa-cog"></i>
+          <span>Settings</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div id="active-account-display" class="account-pill">
+          <div class="account-avatar">
+            <i class="fas fa-user"></i>
+          </div>
+          <div class="account-info">
+            <span class="account-name">No Account</span>
+            <span class="account-type">Select an account</span>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main id="content">
+      <!-- HOME PAGE -->
+      <div id="page-home" class="page active">
+        <div class="page-header">
+          <h1 class="page-title">
+            <span class="title-gradient">VortyMC</span> Launcher
+          </h1>
+          <p class="page-subtitle">Select an instance and start playing</p>
+        </div>
+
+        <div id="instances-grid" class="card-grid">
+          <div class="empty-state" id="home-empty">
+            <div class="empty-icon">
+              <i class="fas fa-cube"></i>
+            </div>
+            <h3>No Instances Yet</h3>
+            <p>Create your first Minecraft instance to get started</p>
+            <button class="btn btn-primary btn-glow" onclick="navigateTo('create')">
+              <i class="fas fa-plus"></i> Create Instance
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREATE PAGE -->
+      <div id="page-create" class="page">
+        <div class="page-header">
+          <h1 class="page-title">
+            <i class="fas fa-plus-circle"></i> <span class="title-gradient">Create</span> Instance
+          </h1>
+          <p class="page-subtitle">Build your own custom Minecraft setup</p>
+        </div>
+
+        <div class="form-card">
+          <div class="form-group">
+            <label class="form-label">Instance Name</label>
+            <input type="text" id="create-name" class="form-input" placeholder="My Awesome World" maxlength="50">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Minecraft Version</label>
+            <div class="version-selector">
+              <div class="version-filters">
+                <button class="filter-btn active" data-filter="release">Releases</button>
+                <button class="filter-btn" data-filter="snapshot">Snapshots</button>
+                <button class="filter-btn" data-filter="old_beta">Beta</button>
+                <button class="filter-btn" data-filter="old_alpha">Alpha</button>
+              </div>
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="version-search" class="form-input" placeholder="Search versions...">
+              </div>
+              <div id="version-list" class="version-list">
+                <div class="loading-spinner">
+                  <i class="fas fa-spinner fa-spin"></i> Loading versions...
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">JVM Arguments</label>
+            <input type="text" id="create-jvmargs" class="form-input mono" value="-Xmx2G -Xms512M" placeholder="-Xmx2G -Xms512M">
+            <span class="form-hint">Customize memory allocation and JVM flags</span>
+          </div>
+
+          <div class="form-actions">
+            <button id="btn-create-instance" class="btn btn-primary btn-glow btn-lg">
+              <i class="fas fa-rocket"></i> Create Instance
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VERSIONS PAGE -->
+      <div id="page-versions" class="page">
+        <div class="page-header">
+          <h1 class="page-title">
+            <i class="fas fa-download"></i> <span class="title-gradient">Version</span> Manager
+          </h1>
+          <p class="page-subtitle">Browse and install Minecraft versions</p>
+        </div>
+
+        <div class="versions-controls">
+          <div class="search-box wide">
+            <i class="fas fa-search"></i>
+            <input type="text" id="versions-search" class="form-input" placeholder="Search all versions...">
+          </div>
+          <div class="version-filters" id="versions-page-filters">
+            <button class="filter-btn active" data-filter="release">Releases</button>
+            <button class="filter-btn" data-filter="snapshot">Snapshots</button>
+            <button class="filter-btn" data-filter="old_beta">Beta</button>
+            <button class="filter-btn" data-filter="old_alpha">Alpha</button>
+          </div>
+        </div>
+
+        <div id="versions-grid" class="versions-table">
+          <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i> Loading versions...
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCOUNTS PAGE -->
+      <div id="page-accounts" class="page">
+        <div class="page-header">
+          <h1 class="page-title">
+            <i class="fas fa-user-circle"></i> <span class="title-gradient">Accounts</span>
+          </h1>
+          <p class="page-subtitle">Manage your Minecraft accounts</p>
+        </div>
+
+        <div class="accounts-actions">
+          <button id="btn-add-offline" class="btn btn-secondary">
+            <i class="fas fa-user-plus"></i> Add Offline Account
+          </button>
+          <button id="btn-add-microsoft" class="btn btn-primary btn-glow">
+            <i class="fab fa-microsoft"></i> Sign in with Microsoft
+          </button>
+        </div>
+
+        <div id="accounts-list" class="accounts-list">
+          <div class="empty-state" id="accounts-empty">
+            <div class="empty-icon">
+              <i class="fas fa-user-slash"></i>
+            </div>
+            <h3>No Accounts</h3>
+            <p>Add an offline account or sign in with Microsoft</p>
+          </div>
+        </div>
+
+        <!-- Offline Account Modal -->
+        <div id="modal-offline" class="modal-overlay hidden">
+          <div class="modal">
+            <div class="modal-header">
+              <h2>Add Offline Account</h2>
+              <button class="modal-close" onclick="closeModal('modal-offline')">
+                <i class="fas fa-xmark"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" id="offline-username" class="form-input" placeholder="Steve" minlength="3" maxlength="16">
+                <span class="form-hint">3-16 characters, used as your in-game name</span>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" onclick="closeModal('modal-offline')">Cancel</button>
+              <button id="btn-confirm-offline" class="btn btn-primary">
+                <i class="fas fa-check"></i> Add Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS PAGE -->
+      <div id="page-settings" class="page">
+        <div class="page-header">
+          <h1 class="page-title">
+            <i class="fas fa-cog"></i> <span class="title-gradient">Settings</span>
+          </h1>
+          <p class="page-subtitle">Configure your launcher preferences</p>
+        </div>
+
+        <div class="settings-sections">
+          <div class="settings-card">
+            <h3 class="settings-title"><i class="fas fa-coffee"></i> Java Configuration</h3>
+            <div class="form-group">
+              <label class="form-label">Java Path</label>
+              <div class="input-group">
+                <input type="text" id="settings-java" class="form-input" placeholder="java" value="java">
+                <button id="btn-browse-java" class="btn btn-secondary btn-sm">
+                  <i class="fas fa-folder-open"></i> Browse
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3 class="settings-title"><i class="fas fa-memory"></i> Memory</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Minimum RAM</label>
+                <select id="settings-ram-min" class="form-select">
+                  <option value="256M">256 MB</option>
+                  <option value="512M" selected>512 MB</option>
+                  <option value="1G">1 GB</option>
+                  <option value="2G">2 GB</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Maximum RAM</label>
+                <select id="settings-ram-max" class="form-select">
+                  <option value="1G">1 GB</option>
+                  <option value="2G" selected>2 GB</option>
+                  <option value="4G">4 GB</option>
+                  <option value="6G">6 GB</option>
+                  <option value="8G">8 GB</option>
+                  <option value="12G">12 GB</option>
+                  <option value="16G">16 GB</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3 class="settings-title"><i class="fas fa-info-circle"></i> About</h3>
+            <div class="about-info">
+              <p><strong>VortyMC Launcher</strong> v1.0.0</p>
+              <p>Built by VortyYT</p>
+              <p class="text-muted">A custom Minecraft launcher with style.</p>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="btn-save-settings" class="btn btn-primary btn-glow">
+              <i class="fas fa-save"></i> Save Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Launch Status Overlay -->
+      <div id="launch-overlay" class="launch-overlay hidden">
+        <div class="launch-content">
+          <div class="launch-spinner">
+            <div class="spinner-ring"></div>
+            <i class="fas fa-cube spinner-icon"></i>
+          </div>
+          <h2 id="launch-status-text">Launching Minecraft...</h2>
+          <p id="launch-status-detail">Preparing game files</p>
+          <div class="launch-progress">
+            <div id="launch-progress-bar" class="progress-fill"></div>
+          </div>
+          <button id="btn-cancel-launch" class="btn btn-secondary btn-sm" style="margin-top: 16px;">Cancel</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
