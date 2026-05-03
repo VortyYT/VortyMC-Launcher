@@ -810,6 +810,32 @@ body {
   padding: 40px 20px 32px;
   position: relative;
   z-index: 1;
+  overflow: hidden;
+}
+
+.home-hero__glow {
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(124, 58, 237, 0.12) 0%, rgba(217, 70, 239, 0.05) 40%, transparent 70%);
+  pointer-events: none;
+  animation: pulse-glow-bg 4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-bg {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+}
+
+.home-hero__version {
+  font-family: var(--font-display);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 3px;
+  margin-bottom: 24px;
 }
 
 .home-hero__title {
@@ -899,4 +925,81 @@ body {
   border: solid white;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+}
+
+/* ── Microsoft Login Spinner ────────────────────────────────────────────────── */
+.ms-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--purple-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Neon Glow Line Accents ─────────────────────────────────────────────────── */
+.glow-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--purple-main), var(--purple-neon), var(--purple-main), transparent);
+  opacity: 0.5;
+}
+
+/* ── Version Status Dot ─────────────────────────────────────────────────────── */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot--online {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+.status-dot--offline {
+  background: var(--text-muted);
+}
+
+/* ── Home Features Section ──────────────────────────────────────────────────── */
+.home-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.home-feature {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+}
+.home-feature:hover {
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-neon);
+}
+
+.home-feature__icon {
+  font-size: 22px;
+  color: var(--purple-light);
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px var(--purple-glow));
+}
+
+.home-feature__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.home-feature__desc {
+  font-size: 12px;
+  color: var(--text-muted);
 }

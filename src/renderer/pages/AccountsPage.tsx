@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FiPlus, FiTrash2, FiUser, FiCheck, FiLogIn } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { FiPlus, FiTrash2, FiUser, FiCheck, FiLogIn, FiCopy, FiExternalLink } from 'react-icons/fi';
 import type { Account } from '../App';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,10 +12,30 @@ interface Props {
   onSetActive: (account: Account) => void;
 }
 
+interface DeviceCodeInfo {
+  userCode: string;
+  verificationUri: string;
+  message: string;
+}
+
 export default function AccountsPage({ accounts, activeAccount, onRefresh, onSetActive }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [username, setUsername] = useState('');
   const [msMessage, setMsMessage] = useState('');
+  const [msLoading, setMsLoading] = useState(false);
+  const [deviceCode, setDeviceCode] = useState<DeviceCodeInfo | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!ipcRenderer) return;
+    const onDeviceCode = (_e: unknown, data: DeviceCodeInfo) => {
+      setDeviceCode(data);
+    };
+    ipcRenderer.on('ms:deviceCode', onDeviceCode);
+    return () => {
+      ipcRenderer.removeListener('ms:deviceCode', onDeviceCode);
+    };
+  }, []);
 
   const addOffline = async () => {
     if (!username.trim()) return;
@@ -42,11 +62,28 @@ export default function AccountsPage({ accounts, activeAccount, onRefresh, onSet
       setMsMessage('Microsoft login is only available in the desktop app.');
       return;
     }
+    setMsLoading(true);
+    setMsMessage('');
+    setDeviceCode(null);
     const result = await ipcRenderer.invoke('accounts:microsoftLogin');
+    setMsLoading(false);
+    setDeviceCode(null);
     if (!result.success) {
       setMsMessage(result.message);
     } else {
+      setMsMessage('');
       onRefresh();
+      if (result.account) {
+        onSetActive(result.account);
+      }
+    }
+  };
+
+  const copyCode = () => {
+    if (deviceCode) {
+      navigator.clipboard.writeText(deviceCode.userCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -62,13 +99,59 @@ export default function AccountsPage({ accounts, activeAccount, onRefresh, onSet
           <FiPlus />
           Add Offline Account
         </button>
-        <button className="btn btn--secondary" onClick={loginMicrosoft}>
+        <button className="btn btn--secondary" onClick={loginMicrosoft} disabled={msLoading}>
           <FiLogIn />
-          Microsoft Login
+          {msLoading ? 'Authenticating...' : 'Microsoft Login'}
         </button>
       </div>
 
-      {msMessage && (
+      {/* Microsoft Device Code Flow UI */}
+      {deviceCode && (
+        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--purple-main)' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 13, marginBottom: 12, letterSpacing: 1, color: 'var(--purple-light)' }}>
+            MICROSOFT LOGIN
+          </h3>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            A browser window has been opened. Enter this code to sign in:
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: 6,
+              color: 'var(--purple-light)',
+              padding: '12px 24px',
+              background: 'var(--bg-primary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--purple-main)',
+              boxShadow: 'var(--shadow-neon)',
+            }}>
+              {deviceCode.userCode}
+            </div>
+            <button className="btn btn--secondary btn--sm" onClick={copyCode}>
+              <FiCopy />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Go to{' '}
+            <span
+              style={{ color: 'var(--neon-cyan)', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => ipcRenderer?.invoke('shell:openExternal', deviceCode.verificationUri)}
+            >
+              {deviceCode.verificationUri} <FiExternalLink style={{ verticalAlign: 'middle', fontSize: 11 }} />
+            </span>
+            {' '}and enter the code above.
+          </p>
+          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="ms-spinner" />
+            Waiting for you to sign in...
+          </div>
+        </div>
+      )}
+
+      {msMessage && !deviceCode && (
         <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
           <div style={{ fontSize: 13, color: 'var(--warning)' }}>{msMessage}</div>
         </div>

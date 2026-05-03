@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FiPlus, FiTrash2, FiPlay, FiPackage } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiPlay, FiPackage, FiDownload } from 'react-icons/fi';
+import type { Account, Settings } from '../App';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ipcRenderer = (window as any).require?.('electron')?.ipcRenderer;
@@ -16,16 +17,33 @@ interface CustomBuild {
 interface VersionEntry {
   id: string;
   type: string;
+  url: string;
 }
 
-export default function CreatePage() {
+interface InstallProgress {
+  versionId: string;
+  status: string;
+  progress: number;
+}
+
+interface Props {
+  account: Account | null;
+  settings: Settings;
+}
+
+export default function CreatePage({ account, settings }: Props) {
   const [builds, setBuilds] = useState<CustomBuild[]>([]);
   const [versions, setVersions] = useState<VersionEntry[]>([]);
+  const [installed, setInstalled] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [baseVersion, setBaseVersion] = useState('');
   const [jvmArgs, setJvmArgs] = useState('-XX:+UseG1GC -XX:+UnlockExperimentalVMOptions');
   const [gameArgs, setGameArgs] = useState('');
+  const [launchingBuild, setLaunchingBuild] = useState<string | null>(null);
+  const [installingBuild, setInstallingBuild] = useState<string | null>(null);
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
+  const [gameRunning, setGameRunning] = useState(false);
 
   const loadBuilds = useCallback(async () => {
     if (!ipcRenderer) return;
@@ -36,22 +54,24 @@ export default function CreatePage() {
   const loadVersions = useCallback(async () => {
     if (!ipcRenderer) {
       setVersions([
-        { id: '1.21', type: 'release' },
-        { id: '1.20.6', type: 'release' },
-        { id: '1.20.4', type: 'release' },
-        { id: '1.20.1', type: 'release' },
-        { id: '1.19.4', type: 'release' },
-        { id: '1.18.2', type: 'release' },
-        { id: '1.16.5', type: 'release' },
-        { id: '1.12.2', type: 'release' },
-        { id: '1.8.9', type: 'release' },
-        { id: '1.7.10', type: 'release' },
-        { id: 'b1.7.3', type: 'old_beta' },
+        { id: '1.21', type: 'release', url: '' },
+        { id: '1.20.6', type: 'release', url: '' },
+        { id: '1.20.4', type: 'release', url: '' },
+        { id: '1.20.1', type: 'release', url: '' },
+        { id: '1.19.4', type: 'release', url: '' },
+        { id: '1.18.2', type: 'release', url: '' },
+        { id: '1.16.5', type: 'release', url: '' },
+        { id: '1.12.2', type: 'release', url: '' },
+        { id: '1.8.9', type: 'release', url: '' },
+        { id: '1.7.10', type: 'release', url: '' },
+        { id: 'b1.7.3', type: 'old_beta', url: '' },
       ]);
       return;
     }
     const v = await ipcRenderer.invoke('versions:list');
+    const inst = await ipcRenderer.invoke('versions:installed');
     setVersions(v);
+    setInstalled(inst);
     if (v.length > 0 && !baseVersion) {
       const firstRelease = v.find((ver: VersionEntry) => ver.type === 'release');
       setBaseVersion(firstRelease?.id || v[0].id);
@@ -62,6 +82,21 @@ export default function CreatePage() {
     loadBuilds();
     loadVersions();
   }, [loadBuilds, loadVersions]);
+
+  useEffect(() => {
+    if (!ipcRenderer) return;
+    const onProgress = (_e: unknown, data: InstallProgress) => setInstallProgress(data);
+    const onExit = () => {
+      setGameRunning(false);
+      setLaunchingBuild(null);
+    };
+    ipcRenderer.on('install:progress', onProgress);
+    ipcRenderer.on('game:exit', onExit);
+    return () => {
+      ipcRenderer.removeListener('install:progress', onProgress);
+      ipcRenderer.removeListener('game:exit', onExit);
+    };
+  }, []);
 
   const handleCreate = async () => {
     if (!name.trim() || !baseVersion) return;
@@ -97,6 +132,49 @@ export default function CreatePage() {
       setBuilds(prev => prev.filter(b => b.id !== id));
     }
   };
+
+  const handleLaunchBuild = async (build: CustomBuild) => {
+    if (!ipcRenderer || !account) return;
+
+    const isInst = installed.includes(build.baseVersion);
+    if (!isInst) {
+      setInstallingBuild(build.id);
+      const version = versions.find(v => v.id === build.baseVersion);
+      if (version) {
+        try {
+          await ipcRenderer.invoke('versions:install', build.baseVersion, version.url);
+          const inst = await ipcRenderer.invoke('versions:installed');
+          setInstalled(inst);
+        } catch (err) {
+          console.error('Install failed:', err);
+          setInstallingBuild(null);
+          setInstallProgress(null);
+          return;
+        }
+      }
+      setInstallingBuild(null);
+      setInstallProgress(null);
+    }
+
+    setLaunchingBuild(build.id);
+    try {
+      const result = await ipcRenderer.invoke('game:launch', {
+        versionId: build.baseVersion,
+        account,
+        jvmArgs: build.jvmArgs,
+        gameArgs: build.gameArgs,
+        memory: settings.memory,
+      });
+      if (result.success) {
+        setGameRunning(true);
+      }
+    } catch (err) {
+      console.error('Launch failed:', err);
+    }
+    setLaunchingBuild(null);
+  };
+
+  const isBuildInstalled = (build: CustomBuild) => installed.includes(build.baseVersion);
 
   return (
     <div className="fade-in">
@@ -182,35 +260,73 @@ export default function CreatePage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-          {builds.map(build => (
-            <div key={build.id} className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{build.name}</h3>
-                  <span className="badge badge--release">{build.baseVersion}</span>
+          {builds.map(build => {
+            const isLaunching = launchingBuild === build.id;
+            const isInstalling = installingBuild === build.id;
+            const buildInstalled = isBuildInstalled(build);
+            return (
+              <div key={build.id} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{build.name}</h3>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span className="badge badge--release">{build.baseVersion}</span>
+                      {buildInstalled && <span className="badge badge--installed">installed</span>}
+                    </div>
+                  </div>
+                  <button className="btn btn--danger btn--sm" onClick={() => handleDelete(build.id)}>
+                    <FiTrash2 />
+                  </button>
                 </div>
-                <button className="btn btn--danger btn--sm" onClick={() => handleDelete(build.id)}>
-                  <FiTrash2 />
+                {build.jvmArgs && (
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    <strong>JVM:</strong> {build.jvmArgs}
+                  </div>
+                )}
+                {build.gameArgs && (
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    <strong>Game:</strong> {build.gameArgs}
+                  </div>
+                )}
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 8 }}>
+                  Created {new Date(build.createdAt).toLocaleDateString()}
+                </div>
+
+                {isInstalling && installProgress && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                      {installProgress.status}
+                    </div>
+                    <div className="progress-bar">
+                      <div className="progress-bar__fill" style={{ width: `${installProgress.progress}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  className="btn btn--primary btn--sm"
+                  style={{ marginTop: 12, width: '100%' }}
+                  onClick={() => handleLaunchBuild(build)}
+                  disabled={!account || isLaunching || isInstalling || gameRunning}
+                >
+                  {isInstalling ? (
+                    <><FiDownload /> Installing...</>
+                  ) : isLaunching ? (
+                    <><FiPlay /> Launching...</>
+                  ) : !buildInstalled ? (
+                    <><FiDownload /> Install & Launch</>
+                  ) : (
+                    <><FiPlay /> Launch</>
+                  )}
                 </button>
+                {!account && (
+                  <div style={{ fontSize: 11, color: 'var(--warning)', textAlign: 'center', marginTop: 6 }}>
+                    Add an account first
+                  </div>
+                )}
               </div>
-              {build.jvmArgs && (
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
-                  <strong>JVM:</strong> {build.jvmArgs}
-                </div>
-              )}
-              {build.gameArgs && (
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
-                  <strong>Game:</strong> {build.gameArgs}
-                </div>
-              )}
-              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 8 }}>
-                Created {new Date(build.createdAt).toLocaleDateString()}
-              </div>
-              <button className="btn btn--primary btn--sm" style={{ marginTop: 12, width: '100%' }}>
-                <FiPlay /> Launch
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
