@@ -1,10 +1,24 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as https from 'https';
 import * as http from 'http';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import { createHash } from 'crypto';
+
+// ── Global Error Handling ──────────────────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+  if (err.message?.includes('ESRCH') || err.message?.includes('kill')) {
+    // Process already exited — safe to ignore
+    return;
+  }
+  dialog.showErrorBox('VortyMC Error', `An unexpected error occurred:\n${err.message}`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Account {
@@ -655,11 +669,23 @@ ipcMain.handle('game:launch', async (_e, opts: {
 
   const args = [...jvmArgsList, ...gameArgsList];
 
+  // Check if Java is available before spawning
+  let javaCmd = process.platform === 'win32' ? 'javaw' : 'java';
   try {
-    const javaCmd = process.platform === 'win32' ? 'javaw' : 'java';
+    execSync(`${javaCmd} -version`, { stdio: 'pipe' });
+  } catch {
+    // Try fallback to 'java' on Windows too
+    javaCmd = 'java';
+    try {
+      execSync(`${javaCmd} -version`, { stdio: 'pipe' });
+    } catch {
+      return { success: false, error: 'Java not found. Please install Java 17+ and make sure it is in your PATH.' };
+    }
+  }
+
+  try {
     gameProcess = spawn(javaCmd, args, {
       cwd: GAME_DIR,
-      detached: process.platform !== 'win32',
       stdio: 'pipe',
     });
 
