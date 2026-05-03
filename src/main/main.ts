@@ -45,6 +45,7 @@ const VERSIONS_DIR = path.join(LAUNCHER_DIR, 'versions');
 const LIBRARIES_DIR = path.join(LAUNCHER_DIR, 'libraries');
 const ASSETS_DIR = path.join(LAUNCHER_DIR, 'assets');
 const GAME_DIR = path.join(LAUNCHER_DIR, 'game');
+const MODS_DIR = path.join(LAUNCHER_DIR, 'mods');
 const ACCOUNTS_FILE = path.join(LAUNCHER_DIR, 'accounts.json');
 const BUILDS_FILE = path.join(LAUNCHER_DIR, 'builds.json');
 const SETTINGS_FILE = path.join(LAUNCHER_DIR, 'settings.json');
@@ -54,7 +55,7 @@ let gameProcess: ChildProcess | null = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function ensureDirs(): void {
-  for (const dir of [LAUNCHER_DIR, VERSIONS_DIR, LIBRARIES_DIR, ASSETS_DIR, GAME_DIR]) {
+  for (const dir of [LAUNCHER_DIR, VERSIONS_DIR, LIBRARIES_DIR, ASSETS_DIR, GAME_DIR, MODS_DIR]) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }
@@ -127,6 +128,11 @@ function offlineUUID(username: string): string {
   ].join('-');
 }
 
+// ── Error Handling ─────────────────────────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
 // ── Window ─────────────────────────────────────────────────────────────────────
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -137,11 +143,20 @@ function createWindow(): void {
     frame: false,
     transparent: false,
     backgroundColor: '#0a0a0f',
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
     icon: path.join(__dirname, '..', 'renderer', 'icon.png'),
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
   });
 
   const isDev = !app.isPackaged;
@@ -515,4 +530,138 @@ ipcMain.handle('shell:openExternal', (_e, url: string) => {
 
 ipcMain.handle('app:getPath', () => {
   return LAUNCHER_DIR;
+});
+
+// ── IPC: Open Version Folder ───────────────────────────────────────────────────
+ipcMain.handle('versions:openFolder', (_e, versionId: string) => {
+  const versionDir = path.join(VERSIONS_DIR, versionId);
+  if (fs.existsSync(versionDir)) {
+    shell.openPath(versionDir);
+  }
+});
+
+// ── IPC: News ──────────────────────────────────────────────────────────────────
+ipcMain.handle('news:fetch', async () => {
+  try {
+    const data = await fetchJSON('https://launchercontent.mojang.com/v2/javaPatchNotes.json') as {
+      entries: Array<{
+        title: string;
+        id: string;
+        version: string;
+        date: string;
+        image: { url: string };
+        body: string;
+      }>;
+    };
+    if (data?.entries) {
+      return data.entries.slice(0, 8).map((entry, i) => ({
+        id: String(i),
+        title: entry.title,
+        tag: 'Java',
+        date: entry.date || '',
+        imageUrl: entry.image?.url ? `https://launchercontent.mojang.com${entry.image.url}` : '',
+        url: 'https://www.minecraft.net',
+      }));
+    }
+    return [];
+  } catch {
+    return [];
+  }
+});
+
+// ── IPC: Modrinth Mod Search ───────────────────────────────────────────────────
+ipcMain.handle('mods:search', async (_e, query: string, gameVersion: string) => {
+  try {
+    const facets = `[["versions:${gameVersion}"],["project_type:mod"]]`;
+    const url = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(facets)}&limit=20`;
+    const data = await fetchJSON(url) as {
+      hits: Array<{
+        slug: string;
+        title: string;
+        description: string;
+        categories: string[];
+        downloads: number;
+        icon_url: string;
+        project_type: string;
+        versions: string[];
+        author: string;
+      }>;
+    };
+    return (data.hits || []).map(h => ({
+      slug: h.slug,
+      title: h.title,
+      description: h.description,
+      categories: h.categories || [],
+      downloads: h.downloads,
+      icon_url: h.icon_url || '',
+      project_type: h.project_type,
+      versions: h.versions || [],
+      author: h.author || '',
+    }));
+  } catch (err) {
+    console.error('Modrinth search error:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('mods:versions', async (_e, slug: string, gameVersion: string) => {
+  try {
+    const url = `https://api.modrinth.com/v2/project/${slug}/version?game_versions=["${gameVersion}"]`;
+    const data = await fetchJSON(url) as Array<{
+      id: string;
+      name: string;
+      version_number: string;
+      game_versions: string[];
+      loaders: string[];
+      files: Array<{ url: string; filename: string; size: number }>;
+    }>;
+    return (data || []).slice(0, 10).map(v => ({
+      id: v.id,
+      name: v.name,
+      version_number: v.version_number,
+      game_versions: v.game_versions,
+      loaders: v.loaders,
+      files: (v.files || []).map(f => ({ url: f.url, filename: f.filename, size: f.size })),
+    }));
+  } catch (err) {
+    console.error('Modrinth versions error:', err);
+    return [];
+  }
+});
+
+interface InstalledMod {
+  slug: string;
+  filename: string;
+  versionId: string;
+}
+
+const INSTALLED_MODS_FILE = path.join(LAUNCHER_DIR, 'installed_mods.json');
+
+ipcMain.handle('mods:installed', (_e, versionId: string) => {
+  const all = readJSON<InstalledMod[]>(INSTALLED_MODS_FILE, []);
+  return all.filter(m => m.versionId === versionId);
+});
+
+ipcMain.handle('mods:install', async (_e, opts: {
+  slug: string;
+  versionId: string;
+  fileUrl: string;
+  filename: string;
+}) => {
+  const { slug, versionId, fileUrl, filename } = opts;
+  const versionModsDir = path.join(MODS_DIR, versionId);
+  fs.mkdirSync(versionModsDir, { recursive: true });
+
+  const destPath = path.join(versionModsDir, filename);
+  await download(fileUrl, destPath);
+
+  const all = readJSON<InstalledMod[]>(INSTALLED_MODS_FILE, []);
+  const existing = all.findIndex(m => m.slug === slug && m.versionId === versionId);
+  if (existing >= 0) {
+    all[existing].filename = filename;
+  } else {
+    all.push({ slug, filename, versionId });
+  }
+  writeJSON(INSTALLED_MODS_FILE, all);
+  return { success: true };
 });

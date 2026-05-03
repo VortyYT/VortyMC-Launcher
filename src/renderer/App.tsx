@@ -3,6 +3,8 @@ import TitleBar from './components/TitleBar';
 import Sidebar from './components/Sidebar';
 import HomePage from './pages/HomePage';
 import PlayPage from './pages/PlayPage';
+import BuildsPage from './pages/BuildsPage';
+import ModsPage from './pages/ModsPage';
 import CreatePage from './pages/CreatePage';
 import AccountsPage from './pages/AccountsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -28,7 +30,7 @@ export interface Settings {
   closeOnLaunch: boolean;
 }
 
-type Page = 'home' | 'play' | 'create' | 'accounts' | 'settings';
+export type Page = 'home' | 'play' | 'builds' | 'mods' | 'create' | 'accounts' | 'settings';
 
 export default function App() {
   const [page, setPage] = useState<Page>('home');
@@ -69,6 +71,10 @@ export default function App() {
         return <HomePage onNavigate={setPage} accountCount={accounts.length} />;
       case 'play':
         return <PlayPage account={activeAccount} settings={settings} />;
+      case 'builds':
+        return <BuildsPage />;
+      case 'mods':
+        return <ModsPage />;
       case 'create':
         return <CreatePage />;
       case 'accounts':
