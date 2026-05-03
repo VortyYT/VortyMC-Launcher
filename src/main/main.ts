@@ -128,6 +128,11 @@ function offlineUUID(username: string): string {
   ].join('-');
 }
 
+// ── Error Handling ─────────────────────────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
 // ── Window ─────────────────────────────────────────────────────────────────────
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -138,11 +143,20 @@ function createWindow(): void {
     frame: false,
     transparent: false,
     backgroundColor: '#0a0a0f',
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
     icon: path.join(__dirname, '..', 'renderer', 'icon.png'),
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`Failed to load: ${errorCode} - ${errorDescription}`);
   });
 
   const isDev = !app.isPackaged;
