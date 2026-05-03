@@ -500,15 +500,17 @@ ipcMain.handle('versions:install', async (_e, versionId: string, versionUrl: str
     rules?: Array<{ action: string; os?: { name: string } }>;
   }>;
 
+  const installOs = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'osx' : 'linux';
+
   if (libraries) {
     let libsDone = 0;
     for (const lib of libraries) {
       if (lib.rules) {
-        const dominated = lib.rules.some(r => {
-          if (r.action === 'allow' && r.os && r.os.name !== 'linux') return true;
-          if (r.action === 'disallow' && r.os && r.os.name === 'linux') return true;
-          return false;
-        });
+        let dominated = false;
+        for (const r of lib.rules) {
+          if (r.action === 'allow' && r.os && r.os.name !== installOs) dominated = true;
+          if (r.action === 'disallow' && r.os && r.os.name === installOs) dominated = true;
+        }
         if (dominated) continue;
       }
 
@@ -598,14 +600,16 @@ ipcMain.handle('game:launch', async (_e, opts: {
     rules?: Array<{ action: string; os?: { name: string } }>;
   }>;
 
+  const currentOs = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'osx' : 'linux';
+
   if (libraries) {
     for (const lib of libraries) {
       if (lib.rules) {
-        const dominated = lib.rules.some(r => {
-          if (r.action === 'allow' && r.os && r.os.name !== 'linux') return true;
-          if (r.action === 'disallow' && r.os && r.os.name === 'linux') return true;
-          return false;
-        });
+        let dominated = false;
+        for (const r of lib.rules) {
+          if (r.action === 'allow' && r.os && r.os.name !== currentOs) dominated = true;
+          if (r.action === 'disallow' && r.os && r.os.name === currentOs) dominated = true;
+        }
         if (dominated) continue;
       }
       if (lib.downloads?.artifact?.path) {
@@ -619,7 +623,8 @@ ipcMain.handle('game:launch', async (_e, opts: {
 
   const clientJar = path.join(versionDir, `${versionId}.jar`);
   libs.push(clientJar);
-  const classpath = libs.join(':');
+  const cpSeparator = process.platform === 'win32' ? ';' : ':';
+  const classpath = libs.join(cpSeparator);
 
   const mainClass = versionData.mainClass as string || 'net.minecraft.client.main.Minecraft';
   const assetIndex = versionData.assetIndex as { id: string } | undefined;
@@ -651,10 +656,17 @@ ipcMain.handle('game:launch', async (_e, opts: {
   const args = [...jvmArgsList, ...gameArgsList];
 
   try {
-    gameProcess = spawn('java', args, {
+    const javaCmd = process.platform === 'win32' ? 'javaw' : 'java';
+    gameProcess = spawn(javaCmd, args, {
       cwd: GAME_DIR,
-      detached: true,
+      detached: process.platform !== 'win32',
       stdio: 'pipe',
+    });
+
+    gameProcess.on('error', (err) => {
+      mainWindow?.webContents.send('game:log', `Failed to start Java: ${err.message}\nMake sure Java 17+ is installed and in your PATH.`);
+      mainWindow?.webContents.send('game:exit', -1);
+      gameProcess = null;
     });
 
     gameProcess.stdout?.on('data', (data: Buffer) => {
@@ -678,7 +690,11 @@ ipcMain.handle('game:launch', async (_e, opts: {
 
 ipcMain.handle('game:kill', () => {
   if (gameProcess) {
-    gameProcess.kill();
+    try {
+      gameProcess.kill();
+    } catch {
+      // Process may have already exited
+    }
     gameProcess = null;
     return true;
   }
