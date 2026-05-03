@@ -70,7 +70,7 @@ export default function App() {
       case 'play':
         return <PlayPage account={activeAccount} settings={settings} />;
       case 'create':
-        return <CreatePage />;
+        return <CreatePage account={activeAccount} settings={settings} />;
       case 'accounts':
         return (
           <AccountsPage

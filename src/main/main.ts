@@ -116,6 +116,30 @@ function fetchJSON(url: string): Promise<unknown> {
   });
 }
 
+function httpsPost(url: string, body: string, contentType: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const options = {
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      res.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 function offlineUUID(username: string): string {
   const hash = createHash('md5').update(`OfflinePlayer:${username}`).digest('hex');
   return [
@@ -194,18 +218,220 @@ ipcMain.handle('accounts:remove', (_e, id: string) => {
   return accounts;
 });
 
-ipcMain.handle('accounts:microsoftLogin', async () => {
-  // Microsoft OAuth flow using device code or auth code
-  // We'll use the auth code flow with a local redirect
-  const CLIENT_ID = 'd6a8e9a6-7e3a-4e5c-b2f0-1a2b3c4d5e6f'; // placeholder; users can set their own Azure app
-  const REDIRECT_URI = 'http://localhost:8921/auth/callback';
+// ── Microsoft OAuth Device Code Flow ───────────────────────────────────────────
+const MS_CLIENT_ID = '1ce16a5a-a4ed-4269-a0db-3e498e3d3075';
 
-  // For now we return a placeholder - full MS auth requires an Azure App registration
-  // The user would need to register an app at https://portal.azure.com
-  return {
-    success: false,
-    message: 'Microsoft login requires an Azure App ID. Please set one in Settings, or use an offline account.',
-  };
+ipcMain.handle('accounts:microsoftLogin', async () => {
+  try {
+    // Step 1: Request device code
+    const deviceCodeBody = `client_id=${MS_CLIENT_ID}&scope=XboxLive.signin%20offline_access`;
+    const deviceCodeRes = await httpsPost(
+      'https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode',
+      deviceCodeBody,
+      'application/x-www-form-urlencoded'
+    );
+    const deviceCode = JSON.parse(deviceCodeRes) as {
+      device_code: string;
+      user_code: string;
+      verification_uri: string;
+      expires_in: number;
+      interval: number;
+      message: string;
+    };
+
+    if (!deviceCode.user_code) {
+      return { success: false, message: 'Failed to get device code from Microsoft.' };
+    }
+
+    // Send the code to the renderer for the user to see
+    mainWindow?.webContents.send('ms:deviceCode', {
+      userCode: deviceCode.user_code,
+      verificationUri: deviceCode.verification_uri,
+      message: deviceCode.message,
+    });
+
+    // Open the browser for the user
+    shell.openExternal(deviceCode.verification_uri);
+
+    // Step 2: Poll for token
+    const interval = (deviceCode.interval || 5) * 1000;
+    const expiresAt = Date.now() + deviceCode.expires_in * 1000;
+
+    let msToken: { access_token: string; refresh_token: string } | null = null;
+
+    while (Date.now() < expiresAt) {
+      await new Promise(r => setTimeout(r, interval));
+
+      const tokenBody = `client_id=${MS_CLIENT_ID}&grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=${deviceCode.device_code}`;
+      const tokenRes = await httpsPost(
+        'https://login.microsoftonline.com/consumers/oauth2/v2.0/token',
+        tokenBody,
+        'application/x-www-form-urlencoded'
+      );
+      const tokenData = JSON.parse(tokenRes) as Record<string, unknown>;
+
+      if (tokenData.error === 'authorization_pending') {
+        continue;
+      }
+      if (tokenData.error) {
+        return { success: false, message: `Microsoft auth error: ${tokenData.error_description || tokenData.error}` };
+      }
+      if (tokenData.access_token) {
+        msToken = {
+          access_token: tokenData.access_token as string,
+          refresh_token: tokenData.refresh_token as string,
+        };
+        break;
+      }
+    }
+
+    if (!msToken) {
+      return { success: false, message: 'Microsoft login timed out. Please try again.' };
+    }
+
+    // Step 3: Authenticate with Xbox Live
+    const xblBody = JSON.stringify({
+      Properties: {
+        AuthMethod: 'RPS',
+        SiteName: 'user.auth.xboxlive.com',
+        RpsTicket: `d=${msToken.access_token}`,
+      },
+      RelyingParty: 'http://auth.xboxlive.com',
+      TokenType: 'JWT',
+    });
+    const xblRes = await httpsPost(
+      'https://user.auth.xboxlive.com/user/authenticate',
+      xblBody,
+      'application/json'
+    );
+    const xblData = JSON.parse(xblRes) as { Token: string; DisplayClaims: { xui: Array<{ uhs: string }> } };
+
+    if (!xblData.Token) {
+      return { success: false, message: 'Failed to authenticate with Xbox Live.' };
+    }
+
+    const xblToken = xblData.Token;
+    const userHash = xblData.DisplayClaims?.xui?.[0]?.uhs;
+
+    // Step 4: Get XSTS token
+    const xstsBody = JSON.stringify({
+      Properties: {
+        SandboxId: 'RETAIL',
+        UserTokens: [xblToken],
+      },
+      RelyingParty: 'rp://api.minecraftservices.com/',
+      TokenType: 'JWT',
+    });
+    const xstsRes = await httpsPost(
+      'https://xsts.auth.xboxlive.com/xsts/authorize',
+      xstsBody,
+      'application/json'
+    );
+    const xstsData = JSON.parse(xstsRes) as { Token: string; XErr?: number };
+
+    if (xstsData.XErr) {
+      const errMessages: Record<number, string> = {
+        2148916233: 'This Microsoft account does not have an Xbox account.',
+        2148916235: 'Xbox Live is not available in your country.',
+        2148916236: 'Adult verification needed.',
+        2148916237: 'Adult verification needed.',
+        2148916238: 'This account is a child account. Please add it to a Family.',
+      };
+      return { success: false, message: errMessages[xstsData.XErr] || `Xbox auth error: ${xstsData.XErr}` };
+    }
+
+    if (!xstsData.Token) {
+      return { success: false, message: 'Failed to get XSTS token.' };
+    }
+
+    // Step 5: Authenticate with Minecraft
+    const mcBody = JSON.stringify({
+      identityToken: `XBL3.0 x=${userHash};${xstsData.Token}`,
+    });
+    const mcRes = await httpsPost(
+      'https://api.minecraftservices.com/authentication/login_with_xbox',
+      mcBody,
+      'application/json'
+    );
+    const mcData = JSON.parse(mcRes) as { access_token: string };
+
+    if (!mcData.access_token) {
+      return { success: false, message: 'Failed to authenticate with Minecraft services.' };
+    }
+
+    // Step 6: Check game ownership
+    const ownershipRes = await new Promise<string>((resolve, reject) => {
+      https.get('https://api.minecraftservices.com/entitlements/mcstore', {
+        headers: { Authorization: `Bearer ${mcData.access_token}` },
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
+    const ownership = JSON.parse(ownershipRes) as { items: Array<{ name: string }> };
+    const ownsGame = ownership.items && ownership.items.length > 0;
+
+    // Step 7: Get profile (username, UUID, skin)
+    const profileRes = await new Promise<string>((resolve, reject) => {
+      https.get('https://api.minecraftservices.com/minecraft/profile', {
+        headers: { Authorization: `Bearer ${mcData.access_token}` },
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
+    const profile = JSON.parse(profileRes) as { id: string; name: string; skins?: Array<{ url: string; state: string }> };
+
+    if (!profile.name) {
+      return {
+        success: false,
+        message: ownsGame
+          ? 'Could not retrieve Minecraft profile.'
+          : 'This Microsoft account does not own Minecraft Java Edition.',
+      };
+    }
+
+    // Format UUID
+    const rawUuid = profile.id;
+    const uuid = [
+      rawUuid.slice(0, 8),
+      rawUuid.slice(8, 12),
+      rawUuid.slice(12, 16),
+      rawUuid.slice(16, 20),
+      rawUuid.slice(20),
+    ].join('-');
+
+    // Get skin URL
+    const activeSkin = profile.skins?.find(s => s.state === 'ACTIVE');
+    const skinUrl = activeSkin ? activeSkin.url : undefined;
+
+    // Save account
+    const accounts = readJSON<Account[]>(ACCOUNTS_FILE, []);
+    const existingIdx = accounts.findIndex(a => a.type === 'microsoft' && a.uuid === uuid);
+    const account: Account = {
+      id: existingIdx >= 0 ? accounts[existingIdx].id : Date.now().toString(),
+      username: profile.name,
+      type: 'microsoft',
+      uuid,
+      accessToken: mcData.access_token,
+      refreshToken: msToken.refresh_token,
+      skinUrl,
+    };
+
+    if (existingIdx >= 0) {
+      accounts[existingIdx] = account;
+    } else {
+      accounts.push(account);
+    }
+    writeJSON(ACCOUNTS_FILE, accounts);
+
+    return { success: true, account };
+  } catch (err) {
+    console.error('Microsoft login error:', err);
+    return { success: false, message: `Login failed: ${err}` };
+  }
 });
 
 // ── IPC: Version Management ────────────────────────────────────────────────────
@@ -218,7 +444,6 @@ ipcMain.handle('versions:list', async () => {
         'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
       ) as VersionManifest;
     }
-    // Filter versions from b1.7.3 onwards (include old_beta, old_alpha, release, snapshot)
     return cachedManifest.versions.map(v => ({
       id: v.id,
       type: v.type,
@@ -251,13 +476,11 @@ ipcMain.handle('versions:install', async (_e, versionId: string, versionUrl: str
 
   mainWindow?.webContents.send('install:progress', { versionId, status: 'Downloading version metadata...', progress: 5 });
 
-  // Download version JSON
   const versionData = await fetchJSON(versionUrl) as Record<string, unknown>;
   writeJSON(versionJsonPath, versionData);
 
   mainWindow?.webContents.send('install:progress', { versionId, status: 'Downloading client jar...', progress: 15 });
 
-  // Download client jar
   const downloads = versionData.downloads as Record<string, { url: string; sha1: string; size: number }>;
   if (downloads?.client) {
     const clientJarPath = path.join(versionDir, `${versionId}.jar`);
@@ -268,7 +491,6 @@ ipcMain.handle('versions:install', async (_e, versionId: string, versionUrl: str
 
   mainWindow?.webContents.send('install:progress', { versionId, status: 'Downloading libraries...', progress: 30 });
 
-  // Download libraries
   const libraries = versionData.libraries as Array<{
     name: string;
     downloads?: {
@@ -281,7 +503,6 @@ ipcMain.handle('versions:install', async (_e, versionId: string, versionUrl: str
   if (libraries) {
     let libsDone = 0;
     for (const lib of libraries) {
-      // Check rules
       if (lib.rules) {
         const dominated = lib.rules.some(r => {
           if (r.action === 'allow' && r.os && r.os.name !== 'linux') return true;
@@ -309,7 +530,6 @@ ipcMain.handle('versions:install', async (_e, versionId: string, versionUrl: str
 
   mainWindow?.webContents.send('install:progress', { versionId, status: 'Downloading assets...', progress: 75 });
 
-  // Download asset index
   const assetIndex = versionData.assetIndex as { id: string; url: string } | undefined;
   if (assetIndex) {
     const indexDir = path.join(ASSETS_DIR, 'indexes');
@@ -319,7 +539,6 @@ ipcMain.handle('versions:install', async (_e, versionId: string, versionUrl: str
       await download(assetIndex.url, indexPath);
     }
 
-    // Download individual assets (only a subset to keep install fast)
     try {
       const indexData = readJSON<{ objects: Record<string, { hash: string; size: number }> }>(indexPath, { objects: {} });
       const objectKeys = Object.keys(indexData.objects);
@@ -373,7 +592,6 @@ ipcMain.handle('game:launch', async (_e, opts: {
 
   const versionData = readJSON<Record<string, unknown>>(versionJsonPath, {});
 
-  // Build classpath
   const libs: string[] = [];
   const libraries = versionData.libraries as Array<{
     downloads?: { artifact?: { path: string } };
