@@ -1,0 +1,104 @@
+/* VortyMC Launcher - Neon Purple & Black Theme */
+:root {
+  /* Core colors */
+  --bg-darkest: #05050a;
+  --bg-dark: #0a0a14;
+  --bg-main: #0d0d1a;
+  --bg-card: #111128;
+  --bg-card-hover: #161640;
+  --bg-elevated: #1a1a3e;
+  --bg-input: #0f0f25;
+
+  /* Purple neon palette */
+  --purple-dark: #4a00a0;
+  --purple: #7b2ff2;
+  --purple-light: #9d5cff;
+  --purple-glow: #b47aff;
+  --purple-bright: #c9a0ff;
+  --purple-muted: #6e4aad;
+
+  /* Neon accents */
+  --neon-purple: #bf5af2;
+  --neon-blue: #5e5ce6;
+  --neon-cyan: #64d2ff;
+  --neon-pink: #ff2d55;
+  --neon-green: #30d158;
+  --neon-orange: #ff9f0a;
+
+  /* Text colors */
+  --text-primary: #f0eaff;
+  --text-secondary: #a8a0c0;
+  --text-muted: #6e6890;
+  --text-accent: var(--purple-light);
+
+  /* Borders */
+  --border-subtle: rgba(123, 47, 242, 0.12);
+  --border-default: rgba(123, 47, 242, 0.25);
+  --border-bright: rgba(123, 47, 242, 0.5);
+
+  /* Shadows & glows */
+  --glow-sm: 0 0 8px rgba(123, 47, 242, 0.3);
+  --glow-md: 0 0 16px rgba(123, 47, 242, 0.4);
+  --glow-lg: 0 0 32px rgba(123, 47, 242, 0.5);
+  --glow-text: 0 0 10px rgba(157, 92, 255, 0.6);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 1px rgba(123, 47, 242, 0.2);
+  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 2px rgba(123, 47, 242, 0.3);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #7b2ff2 0%, #9d5cff 50%, #5e5ce6 100%);
+  --gradient-card: linear-gradient(145deg, rgba(17, 17, 40, 0.9), rgba(13, 13, 26, 0.95));
+  --gradient-sidebar: linear-gradient(180deg, #0a0a18 0%, #0d0d22 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(123, 47, 242, 0.15), rgba(94, 92, 230, 0.1));
+
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Transitions */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 150ms var(--ease);
+  --transition-normal: 250ms var(--ease);
+  --transition-slow: 400ms var(--ease);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-darkest);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(123, 47, 242, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(123, 47, 242, 0.5);
+}
+
+::selection {
+  background: rgba(123, 47, 242, 0.4);
+  color: #fff;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}

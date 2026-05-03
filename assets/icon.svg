@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a14"/>
+      <stop offset="100%" style="stop-color:#111128"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7b2ff2"/>
+      <stop offset="50%" style="stop-color:#9d5cff"/>
+      <stop offset="100%" style="stop-color:#5e5ce6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="64" fill="none" stroke="url(#purple)" stroke-width="3" opacity="0.3"/>
+  <!-- Cube / Block -->
+  <g transform="translate(256, 240)" filter="url(#glow)">
+    <!-- Top face -->
+    <polygon points="0,-80 120,-20 0,40 -120,-20" fill="#9d5cff" opacity="0.9"/>
+    <!-- Left face -->
+    <polygon points="-120,-20 0,40 0,140 -120,80" fill="#7b2ff2" opacity="0.85"/>
+    <!-- Right face -->
+    <polygon points="120,-20 0,40 0,140 120,80" fill="#5e5ce6" opacity="0.8"/>
+    <!-- Grid lines -->
+    <line x1="-60" y1="-50" x2="-60" y2="110" stroke="#0a0a14" stroke-width="2" opacity="0.3"/>
+    <line x1="60" y1="-50" x2="60" y2="110" stroke="#0a0a14" stroke-width="2" opacity="0.3"/>
+    <line x1="-120" y1="30" x2="120" y2="30" stroke="#0a0a14" stroke-width="2" opacity="0.3"/>
+  </g>
+  <!-- V letter -->
+  <text x="256" y="420" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="60" font-weight="900" fill="url(#purple)" filter="url(#glow)">VORTY</text>
+</svg>
